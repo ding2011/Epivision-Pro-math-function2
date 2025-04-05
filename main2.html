@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>EpiVision Pro | 数学函数可视化系统</title>
+    <style>
+        :root {
+            --primary: #0071ff;
+            --secondary: #7d64ff;
+            --accent: #00c4ff;
+            --text-light: rgba(255,255,255,0.92);
+            --text-secondary: rgba(255,255,255,0.7);
+            --glass-bg: rgba(255,255,255,0.12);
+            --glass-border: rgba(255,255,255,0.2);
+            --dark-bg: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            --mobile-breakpoint: 768px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: var(--dark-bg);
+            color: var(--text-light);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 12px;
+            gap: 12px;
+            overflow-x: hidden;
+            touch-action: manipulation;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: row;
+            gap: 12px;
+            height: calc(100vh - 24px);
+            width: 100%;
+            position: relative;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                height: auto;
+                min-height: calc(100vh - 24px);
+                gap: 16px;
+            }
+            .control-panel {
+                width: 100% !important;
+                max-height: 40vh;
+                padding: 16px;
+                border-radius: 18px;
+            }
+            .graph-container {
+                height: 50vh;
+                min-height: 300px;
+                flex: 1;
+            }
+        }
+
+        /* 控制面板 - 玻璃拟态风格 */
+        .control-panel {
+            width: 360px;
+            background: var(--glass-bg);
+            border-radius: 24px;
+            padding: 24px;
+            backdrop-filter: blur(40px);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--shadow);
+            height: 100%;
+            overflow-y: auto;
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 10;
+        }
+
+        .control-panel::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .control-panel::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+        }
+
+        /* 图表容器 - 全息投影效果 */
+        .graph-container {
+            flex: 1;
+            min-height: 400px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 18px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--glass-border);
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* 输入组 - 移动端优化 */
+        .input-group {
+            margin-bottom: 16px;
+            position: relative;
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        input, button, select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            font-size: 15px;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-light);
+            outline: none;
+        }
+
+        /* 修复下拉菜单样式 */
+        select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300c4ff'%3e%3cpath d='M7 10l5 5 5-5z'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 14px;
+            padding-right: 36px;
+        }
+
+        select option {
+            background: #1a2b3a;
+            color: var(--text-light);
+        }
+
+        input:focus, select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(0, 196, 255, 0.2);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        input::placeholder {
+            color: rgba(255,255,255,0.4);
+        }
+
+        .range-inputs {
+            display: flex;
+            gap: 8px;
+        }
+
+        .range-inputs input {
+            flex: 1;
+            min-width: 0;
+        }
+
+        /* 按钮 - 移动端优化 */
+        button {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+            padding: 14px;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--secondary), var(--accent));
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: -1;
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .secondary-btn {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        /* 浮动信息面板 - 移动端优化 */
+        .coord-info {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            background: var(--glass-bg);
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-family: 'SF Mono', monospace;
+            font-size: 12px;
+            z-index: 100;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(20px);
+            color: var(--accent);
+            max-width: calc(100% - 24px);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .lang-switch {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--glass-bg);
+            padding: 8px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(20px);
+            z-index: 100;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        /* 动态网格背景 */
+        .grid-pattern {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                linear-gradient(rgba(0, 113, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 113, 255, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* 数学符号装饰 - 移动端缩小 */
+        .math-decoration {
+            position: absolute;
+            color: rgba(0, 196, 255, 0.1);
+            font-size: 80px;
+            z-index: -1;
+            animation: float 8s ease-in-out infinite alternate;
+        }
+
+        @media (max-width: 480px) {
+            .math-decoration {
+                font-size: 60px;
+            }
+            .action-buttons {
+                flex-direction: column;
+            }
+            button {
+                width: 100%;
+            }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-10px) scale(1.05); }
+        }
+
+        /* 移动端工具栏 */
+        .mobile-toolbar {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--glass-bg);
+            padding: 8px;
+            border-radius: 20px;
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--shadow);
+            z-index: 100;
+        }
+
+        @media (max-width: 768px) {
+            .mobile-toolbar {
+                display: flex;
+                gap: 8px;
+            }
+        }
+
+        .mobile-tool-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .mobile-tool-btn:active {
+            background: rgba(0, 196, 255, 0.2);
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body>
+    <!-- 背景装饰元素 -->
+    <div class="grid-pattern"></div>
+    <div class="math-decoration" style="top:10%;right:5%;">∫</div>
+    <div class="math-decoration" style="bottom:15%;left:8%;">∑</div>
+    <div class="math-decoration" style="top:30%;left:15%;">∞</div>
+
+    <div class="container">
+        <div class="control-panel">
+            <div class="input-group">
+                <label id="functionLabel" data-i18n="functionLabel"></label>
+                <input type="text" id="functionInput" 
+                       data-i18n-placeholder="placeholder" 
+                       value="Math.sin(x)*x">
+            </div>
+
+            <div class="input-group">
+                <label data-i18n="modeLabel"></label>
+                <select id="renderMode">
+                    <option value="line" data-i18n="lineMode"></option>
+                    <option value="scatter" data-i18n="scatterMode"></option>
+                    <option value="area" data-i18n="areaMode"></option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label data-i18n="xRangeLabel"></label>
+                <div class="range-inputs">
+                    <input type="number" id="xMin" step="any">
+                    <input type="number" id="xMax" step="any">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label data-i18n="yRangeLabel"></label>
+                <div class="range-inputs">
+                    <input type="number" id="yMin" step="any">
+                    <input type="number" id="yMax" step="any">
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button id="resetView" data-i18n="resetView"></button>
+                <button id="exportBtn" class="secondary-btn" data-i18n="exportBtn"></button>
+            </div>
+        </div>
+
+        <div class="graph-container">
+            <canvas id="graphCanvas"></canvas>
+            <div class="coord-info" id="coordInfo"></div>
+            <div class="lang-switch" id="langSwitch"></div>
+        </div>
+    </div>
+
+    <!-- 移动端工具栏 -->
+    <div class="mobile-toolbar">
+        <button class="mobile-tool-btn" id="mobileZoomIn">+</button>
+        <button class="mobile-tool-btn" id="mobileZoomOut">-</button>
+        <button class="mobile-tool-btn" id="mobileReset">↻</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const translations = {
+                en: {
+                    title: "EpiVision Pro",
+                    functionLabel: "Function Expression (JavaScript syntax)",
+                    modeLabel: "Render Mode",
+                    lineMode: "Line Chart",
+                    scatterMode: "Scatter Plot",
+                    areaMode: "Area Chart",
+                    xRangeLabel: "X Axis Range",
+                    yRangeLabel: "Y Axis Range",
+                    resetView: "Reset View",
+                    exportBtn: "Export Image",
+                    langSwitch: "EN/中文",
+                    coordFormat: (x, y) => `X: ${x.toFixed(2)}, Y: ${y.toFixed(2)}`,
+                    placeholder: "e.g. Math.sin(x)*x"
+                },
+                zh: {
+                    title: "EpiVision Pro | 数学可视化",
+                    functionLabel: "函数表达式 (JavaScript语法)",
+                    modeLabel: "渲染模式",
+                    lineMode: "折线图",
+                    scatterMode: "散点图",
+                    areaMode: "面积图",
+                    xRangeLabel: "X轴范围",
+                    yRangeLabel: "Y轴范围",
+                    resetView: "重置视图",
+                    exportBtn: "导出图片",
+                    langSwitch: "EN/中文",
+                    coordFormat: (x, y) => `X：${x.toFixed(2)}，Y：${y.toFixed(2)}`,
+                    placeholder: "例如：Math.sin(x)*x"
+                }
+            };
+
+            let currentLang = 'zh';
+            let userSetRange = { x: [-10, 10], y: [-5, 5] };
+            
+            const elements = {
+                functionInput: document.getElementById('functionInput'),
+                renderMode: document.getElementById('renderMode'),
+                xMin: document.getElementById('xMin'),
+                xMax: document.getElementById('xMax'),
+                yMin: document.getElementById('yMin'),
+                yMax: document.getElementById('yMax'),
+                resetView: document.getElementById('resetView'),
+                exportBtn: document.getElementById('exportBtn'),
+                langSwitch: document.getElementById('langSwitch'),
+                graphCanvas: document.getElementById('graphCanvas'),
+                coordInfo: document.getElementById('coordInfo'),
+                mobileZoomIn: document.getElementById('mobileZoomIn'),
+                mobileZoomOut: document.getElementById('mobileZoomOut'),
+                mobileReset: document.getElementById('mobileReset')
+            };
+
+            class MathVisualizer {
+                constructor(canvas) {
+                    this.canvas = canvas;
+                    this.ctx = canvas.getContext('2d');
+                    this.dpr = window.devicePixelRatio || 1;
+                    this.viewport = { 
+                        x: [...userSetRange.x],
+                        y: [...userSetRange.y]
+                    };
+                    this.isDragging = false;
+                    this.lastTouchDistance = null;
+                    this.initCanvas();
+                    this.setupEventListeners();
+                }
+
+                initCanvas() {
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.canvas.width = rect.width * this.dpr;
+                    this.canvas.height = rect.height * this.dpr;
+                    this.ctx.scale(this.dpr, this.dpr);
+                }
+
+                setupEventListeners() {
+                    // 桌面端事件
+                    this.canvas.addEventListener('mousedown', (e) => this.startDrag(e));
+                    this.canvas.addEventListener('mousemove', (e) => this.handleMove(e));
+                    this.canvas.addEventListener('mouseup', () => this.endDrag());
+                    this.canvas.addEventListener('mouseleave', () => this.endDrag());
+                    this.canvas.addEventListener('wheel', (e) => this.handleZoom(e));
+                    
+                    // 移动端事件
+                    this.canvas.addEventListener('touchstart', (e) => {
+                        if (e.touches.length === 1) {
+                            this.startDrag(e.touches[0]);
+                        } else if (e.touches.length === 2) {
+                            this.handleTouchStart(e);
+                        }
+                    }, { passive: false });
+                    
+                    this.canvas.addEventListener('touchmove', (e) => {
+                        e.preventDefault();
+                        if (e.touches.length === 1) {
+                            this.handleMove(e.touches[0]);
+                        } else if (e.touches.length === 2) {
+                            this.handleTouchMove(e);
+                        }
+                    }, { passive: false });
+                    
+                    this.canvas.addEventListener('touchend', () => this.endDrag());
+                    
+                    // 移动端工具栏按钮
+                    elements.mobileZoomIn.addEventListener('click', () => this.handleZoom({ deltaY: -1 }));
+                    elements.mobileZoomOut.addEventListener('click', () => this.handleZoom({ deltaY: 1 }));
+                    elements.mobileReset.addEventListener('click', () => {
+                        this.viewport = { 
+                            x: [...userSetRange.x],
+                            y: [...userSetRange.y]
+                        };
+                        this.syncInputs();
+                        this.render();
+                    });
+                }
+
+                coordinateTransform() {
+                    return {
+                        screenX: (x) => (x - this.viewport.x[0]) / 
+                                      (this.viewport.x[1] - this.viewport.x[0]) * this.canvas.width,
+                        screenY: (y) => this.canvas.height - 
+                                      (y - this.viewport.y[0]) / 
+                                      (this.viewport.y[1] - this.viewport.y[0]) * this.canvas.height,
+                        mathX: (x) => this.viewport.x[0] + 
+                                    (x / this.canvas.width) * 
+                                    (this.viewport.x[1] - this.viewport.x[0]),
+                        mathY: (y) => this.viewport.y[0] + 
+                                    ((this.canvas.height - y) / this.canvas.height) * 
+                                    (this.viewport.y[1] - this.viewport.y[0])
+                    };
+                }
+
+                startDrag(e) {
+                    this.isDragging = true;
+                    this.lastPos = { x: e.clientX, y: e.clientY };
+                }
+
+                handleMove(e) {
+                    const { mathX, mathY } = this.coordinateTransform();
+                    const rect = this.canvas.getBoundingClientRect();
+                    const xVal = mathX(e.clientX - rect.left);
+                    const yVal = mathY(e.clientY - rect.top);
+                    
+                    elements.coordInfo.textContent = 
+                        translations[currentLang].coordFormat(xVal, yVal);
+
+                    if (this.isDragging) {
+                        const dx = e.clientX - this.lastPos.x;
+                        const dy = e.clientY - this.lastPos.y;
+                        this.handlePan(dx, dy);
+                        this.lastPos = { x: e.clientX, y: e.clientY };
+                    }
+                }
+
+                handlePan(dx, dy) {
+                    const dxMath = (dx / this.canvas.width) * (this.viewport.x[1] - this.viewport.x[0]);
+                    const dyMath = (dy / this.canvas.height) * (this.viewport.y[1] - this.viewport.y[0]);
+                    
+                    this.viewport.x = this.viewport.x.map(v => v - dxMath);
+                    this.viewport.y = this.viewport.y.map(v => v + dyMath);
+                    
+                    this.syncInputs();
+                    this.render();
+                }
+
+                endDrag() {
+                    this.isDragging = false;
+                    this.lastTouchDistance = null;
+                }
+
+                handleZoom(e) {
+                    e.preventDefault();
+                    const zoomFactor = e.deltaY > 0 ? 1.2 : 0.8;
+                    const rect = this.canvas.getBoundingClientRect();
+                    const { mathX, mathY } = this.coordinateTransform();
+                    
+                    // 移动端以中心点缩放
+                    const targetX = mathX(rect.width / 2);
+                    const targetY = mathY(rect.height / 2);
+                    
+                    this.viewport.x = [
+                        targetX - (targetX - this.viewport.x[0]) * zoomFactor,
+                        targetX + (this.viewport.x[1] - targetX) * zoomFactor
+                    ];
+                    
+                    this.viewport.y = [
+                        targetY - (targetY - this.viewport.y[0]) * zoomFactor,
+                        targetY + (this.viewport.y[1] - targetY) * zoomFactor
+                    ];
+                    
+                    this.syncInputs();
+                    this.render();
+                }
+
+                handleTouchStart(e) {
+                    this.isDragging = true;
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    this.lastPos = {
+                        x: (touch1.clientX + touch2.clientX) / 2,
+                        y: (touch1.clientY + touch2.clientY) / 2
+                    };
+                    this.lastTouchDistance = Math.hypot(
+                        touch2.clientX - touch1.clientX,
+                        touch2.clientY - touch1.clientY
+                    );
+                }
+
+                handleTouchMove(e) {
+                    if (e.touches.length === 2) {
+                        const touch1 = e.touches[0];
+                        const touch2 = e.touches[1];
+                        const currentDistance = Math.hypot(
+                            touch2.clientX - touch1.clientX,
+                            touch2.clientY - touch1.clientY
+                        );
+
+                        if (this.lastTouchDistance) {
+                            const zoomFactor = currentDistance / this.lastTouchDistance;
+                            this.handleZoom({ deltaY: zoomFactor > 1 ? -1 : 1 });
+                        }
+                        this.lastTouchDistance = currentDistance;
+                        
+                        // 双指拖动
+                        const currentX = (touch1.clientX + touch2.clientX) / 2;
+                        const currentY = (touch1.clientY + touch2.clientY) / 2;
+                        const dx = currentX - this.lastPos.x;
+                        const dy = currentY - this.lastPos.y;
+                        this.handlePan(dx, dy);
+                        this.lastPos = { x: currentX, y: currentY };
+                    }
+                }
+
+                syncInputs() {
+                    elements.xMin.value = this.viewport.x[0].toFixed(2);
+                    elements.xMax.value = this.viewport.x[1].toFixed(2);
+                    elements.yMin.value = this.viewport.y[0].toFixed(2);
+                    elements.yMax.value = this.viewport.y[1].toFixed(2);
+                }
+
+                adaptiveSampling(fn) {
+                    const points = [];
+                    const step = (this.viewport.x[1] - this.viewport.x[0]) / 1000;
+                    
+                    for (let x = this.viewport.x[0]; x <= this.viewport.x[1]; x += step) {
+                        try {
+                            const y = fn(x);
+                            if (!isNaN(y)) points.push({ x, y });
+                        } catch(e) { break; }
+                    }
+                    return points;
+                }
+
+                render() {
+                    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                    this.drawGrid();
+                    
+                    try {
+                        const fn = new Function('x', `return ${elements.functionInput.value};`);
+                        const points = this.adaptiveSampling(fn);
+                        const mode = elements.renderMode.value;
+                        
+                        const { screenX, screenY } = this.coordinateTransform();
+                        this.ctx.beginPath();
+
+                        points.forEach((p, i) => {
+                            const x = screenX(p.x);
+                            const y = screenY(p.y);
+                            
+                            switch(mode) {
+                                case 'scatter':
+                                    this.ctx.fillStyle = '#00c4ff';
+                                    this.ctx.beginPath();
+                                    this.ctx.arc(x, y, 3 * this.dpr, 0, Math.PI * 2);
+                                    this.ctx.fill();
+                                    break;
+                                case 'area':
+                                    if (i === 0) this.ctx.moveTo(x, y);
+                                    else this.ctx.lineTo(x, y);
+                                    break;
+                                default:
+                                    if (i === 0) this.ctx.moveTo(x, y);
+                                    else this.ctx.lineTo(x, y);
+                            }
+                        });
+
+                        if (mode === 'area') {
+                            this.ctx.lineTo(screenX(this.viewport.x[1]), screenY(0));
+                            this.ctx.lineTo(screenX(this.viewport.x[0]), screenY(0));
+                            this.ctx.closePath();
+                            this.ctx.fillStyle = 'rgba(0, 196, 255, 0.15)';
+                            this.ctx.fill();
+                            this.ctx.strokeStyle = '#00c4ff';
+                            this.ctx.lineWidth = 2 * this.dpr;
+                            this.ctx.stroke();
+                        } else if (mode !== 'scatter') {
+                            this.ctx.strokeStyle = '#00c4ff';
+                            this.ctx.lineWidth = 3 * this.dpr;
+                            this.ctx.stroke();
+                        }
+                    } catch(e) {
+                        console.error('渲染错误:', e);
+                        this.ctx.fillStyle = '#ff3b30';
+                        this.ctx.font = `${14 * this.dpr}px sans-serif`;
+                        this.ctx.fillText(
+                            currentLang === 'zh' ? '函数解析错误' : 'Function Error', 
+                            16 * this.dpr, 
+                            32 * this.dpr
+                        );
+                    }
+                }
+
+                drawGrid() {
+                    const { screenX, screenY } = this.coordinateTransform();
+                    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                    this.ctx.lineWidth = 1 * this.dpr;
+
+                    const calcStep = range => {
+                        const log = Math.log10(range);
+                        const power = Math.floor(log);
+                        return (log - power) > Math.log10(5) ? 5 * 10**power : 2 * 10**power;
+                    };
+
+                    // 垂直网格
+                    const xStep = calcStep(this.viewport.x[1] - this.viewport.x[0]);
+                    for (let x = Math.ceil(this.viewport.x[0]/xStep)*xStep; x <= this.viewport.x[1]; x += xStep) {
+                        const sx = screenX(x);
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(sx, 0);
+                        this.ctx.lineTo(sx, this.canvas.height);
+                        this.ctx.stroke();
+                    }
+
+                    // 水平网格
+                    const yStep = calcStep(this.viewport.y[1] - this.viewport.y[0]);
+                    for (let y = Math.ceil(this.viewport.y[0]/yStep)*yStep; y <= this.viewport.y[1]; y += yStep) {
+                        const sy = screenY(y);
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(0, sy);
+                        this.ctx.lineTo(this.canvas.width, sy);
+                        this.ctx.stroke();
+                    }
+
+                    // 坐标轴
+                    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                    this.ctx.lineWidth = 2 * this.dpr;
+                    const xAxisY = screenY(0);
+                    if (xAxisY >= 0 && xAxisY <= this.canvas.height) {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(0, xAxisY);
+                        this.ctx.lineTo(this.canvas.width, xAxisY);
+                        this.ctx.stroke();
+                    }
+
+                    const yAxisX = screenX(0);
+                    if (yAxisX >= 0 && yAxisX <= this.canvas.width) {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(yAxisX, 0);
+                        this.ctx.lineTo(yAxisX, this.canvas.height);
+                        this.ctx.stroke();
+                    }
+                }
+
+                async export() {
+                    const exportCanvas = document.createElement('canvas');
+                    const exportCtx = exportCanvas.getContext('2d');
+                    const scaleFactor = 2;
+                    
+                    exportCanvas.width = this.canvas.width * scaleFactor;
+                    exportCanvas.height = this.canvas.height * scaleFactor;
+                    exportCtx.scale(scaleFactor, scaleFactor);
+                    
+                    // 绘制背景
+                    exportCtx.fillStyle = '#0f2027';
+                    exportCtx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                    
+                    // 绘制网格
+                    const gridCanvas = document.createElement('canvas');
+                    gridCanvas.width = this.canvas.width;
+                    gridCanvas.height = this.canvas.height;
+                    const gridCtx = gridCanvas.getContext('2d');
+                    this.drawGrid(gridCtx);
+                    exportCtx.drawImage(gridCanvas, 0, 0);
+                    
+                    // 绘制图形
+                    const graphCanvas = document.createElement('canvas');
+                    graphCanvas.width = this.canvas.width;
+                    graphCanvas.height = this.canvas.height;
+                    const graphCtx = graphCanvas.getContext('2d');
+                    this.renderToContext(graphCtx);
+                    exportCtx.drawImage(graphCanvas, 0, 0);
+
+                    // 添加标注
+                    exportCtx.font = `${12 * scaleFactor}px 'SF Pro Display'`;
+                    exportCtx.fillStyle = 'rgba(255,255,255,0.6)';
+                    exportCtx.fillText(`EpiVision Pro Export - ${new Date().toLocaleString()}`, 10, 20);
+                    
+                    // 触发下载
+                    const link = document.createElement('a');
+                    link.download = `EpiVision_${Date.now()}.png`;
+                    link.href = exportCanvas.toDataURL('image/png', 1.0);
+                    link.click();
+                }
+
+                renderToContext(ctx) {
+                    const originalCtx = this.ctx;
+                    this.ctx = ctx;
+                    this.render();
+                    this.ctx = originalCtx;
+                }
+            }
+
+            // 初始化系统
+            const visualizer = new MathVisualizer(elements.graphCanvas);
+
+            function updateTranslations() {
+                const t = translations[currentLang];
+                
+                document.title = t.title;
+                document.querySelectorAll('[data-i18n]').forEach(el => {
+                    const key = el.dataset.i18n;
+                    el.textContent = t[key];
+                });
+
+                elements.functionInput.placeholder = t.placeholder;
+
+                Array.from(elements.renderMode.options).forEach(option => {
+                    option.textContent = t[option.dataset.i18n];
+                });
+
+                elements.langSwitch.textContent = t.langSwitch;
+            }
+
+            function setupEventListeners() {
+                // 范围输入处理
+                const updateViewport = () => {
+                    const xMin = parseFloat(elements.xMin.value);
+                    const xMax = parseFloat(elements.xMax.value);
+                    const yMin = parseFloat(elements.yMin.value);
+                    const yMax = parseFloat(elements.yMax.value);
+
+                    if (!isNaN(xMin)) userSetRange.x[0] = xMin;
+                    if (!isNaN(xMax)) userSetRange.x[1] = xMax;
+                    if (!isNaN(yMin)) userSetRange.y[0] = yMin;
+                    if (!isNaN(yMax)) userSetRange.y[1] = yMax;
+
+                    visualizer.viewport = { 
+                        x: [...userSetRange.x],
+                        y: [...userSetRange.y]
+                    };
+                    visualizer.render();
+                };
+
+                [elements.xMin, elements.xMax, elements.yMin, elements.yMax].forEach(input => {
+                    input.addEventListener('change', updateViewport);
+                });
+
+                // 函数输入防抖
+                let renderTimeout;
+                elements.functionInput.addEventListener('input', () => {
+                    clearTimeout(renderTimeout);
+                    renderTimeout = setTimeout(() => visualizer.render(), 300);
+                });
+
+                // 重置视图
+                elements.resetView.addEventListener('click', () => {
+                    visualizer.viewport = { 
+                        x: [...userSetRange.x],
+                        y: [...userSetRange.y]
+                    };
+                    visualizer.syncInputs();
+                    visualizer.render();
+                });
+
+                // 导出图片
+                elements.exportBtn.addEventListener('click', () => visualizer.export());
+
+                // 语言切换
+                elements.langSwitch.addEventListener('click', () => {
+                    currentLang = currentLang === 'zh' ? 'en' : 'zh';
+                    document.documentElement.lang = currentLang;
+                    updateTranslations();
+                    visualizer.render();
+                });
+
+                // 窗口大小变化
+                window.addEventListener('resize', () => {
+                    visualizer.initCanvas();
+                    visualizer.render();
+                });
+            }
+
+            // 初始化输入值
+            elements.xMin.value = userSetRange.x[0];
+            elements.xMax.value = userSetRange.x[1];
+            elements.yMin.value = userSetRange.y[0];
+            elements.yMax.value = userSetRange.y[1];
+
+            updateTranslations();
+            setupEventListeners();
+            visualizer.render();
+        });
+    </script>
+</body>
+</html>

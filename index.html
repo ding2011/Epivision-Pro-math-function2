@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Epivision | 数学函数可视化系统</title>
+    <style>
+        /* 响应式基础变量 */
+        :root {
+            --primary: #0071ff;
+            --secondary: #7d64ff;
+            --accent: #00c4ff;
+            --text-light: rgba(255,255,255,0.92);
+            --glass-bg: rgba(255,255,255,0.12);
+            --mobile-breakpoint: 768px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+            overflow: hidden;
+            height: 100vh;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            touch-action: manipulation;
+        }
+
+        /* 响应式主容器 */
+        .intro-container {
+            position: relative;
+            width: 94%;
+            max-width: 900px;
+            padding: clamp(1.5rem, 5vw, 3rem);
+            border-radius: clamp(16px, 3vw, 24px);
+            backdrop-filter: blur(40px);
+            background: var(--glass-bg);
+            border: 1px solid rgba(255,255,255,0.1);
+            overflow: hidden;
+            opacity: 0;
+            transform: scale(0.98);
+            transition: all 1s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* 数学符号星系 - 响应式调整 */
+        .math-galaxy {
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            left: -50%;
+            top: -50%;
+            z-index: -1;
+        }
+
+        .orbit {
+            position: absolute;
+            border: 1px solid rgba(0,193,255,0.1);
+            border-radius: 50%;
+            transform-style: preserve-3d;
+            animation: orbit linear infinite;
+            opacity: 0;
+        }
+
+        .math-symbol {
+            position: absolute;
+            color: var(--accent);
+            font-size: clamp(0.8rem, 2vw, 1.2rem);
+            transform-origin: center;
+            animation: float 6s ease-in-out infinite alternate;
+            will-change: transform, opacity;
+        }
+
+        @keyframes orbit {
+            to { transform: rotateY(360deg) rotateX(360deg); }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) scale(1); opacity: 0.8; }
+            50% { transform: translateY(-12px) scale(1.1); opacity: 1; }
+        }
+
+        /* 标题系统 - 响应式调整 */
+        .title-system {
+            text-align: center;
+            position: relative;
+            margin-bottom: clamp(1rem, 4vw, 3rem);
+        }
+
+        .main-title {
+            font-size: clamp(1.8rem, 6vw, 3.5rem);
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: clamp(0.8rem, 2vw, 1.5rem);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .sub-title {
+            font-size: clamp(0.9rem, 3vw, 1.2rem);
+            color: rgba(255,255,255,0.7);
+            line-height: 1.6;
+            opacity: 0;
+            transform: translateY(15px);
+            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s;
+        }
+
+        /* 3D函数曲面 - 响应式调整 */
+        .function-surface {
+            position: absolute;
+            width: clamp(200px, 60vw, 300px);
+            height: clamp(200px, 60vw, 300px);
+            left: 50%;
+            top: clamp(30%, 35%, 40%);
+            transform: translate(-50%, -50%) rotateX(60deg) rotateZ(45deg);
+            transform-style: preserve-3d;
+            opacity: 0;
+            transition: opacity 1.5s 1.2s;
+        }
+
+        .surface-grid {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: 
+                linear-gradient(rgba(0,113,255,0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,113,255,0.1) 1px, transparent 1px);
+            background-size: clamp(15px, 4vw, 20px) clamp(15px, 4vw, 20px);
+            animation: pulse 6s infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 10px rgba(0,113,255,0.3); }
+            100% { box-shadow: 0 0 20px rgba(125,100,255,0.4); }
+        }
+
+        /* 动态公式展示 - 优化过渡 */
+        .formula-container {
+            position: relative;
+            height: clamp(3rem, 8vw, 4rem);
+            margin: clamp(1rem, 3vw, 2rem) auto;
+            overflow: hidden;
+        }
+
+        .formula-display {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            text-align: center;
+            font-size: clamp(1rem, 3vw, 1.5rem);
+            color: rgba(255,255,255,0.6);
+            opacity: 0;
+            transition: all 0.8s cubic-bezier(0.2, 0.8, 0.4, 1);
+        }
+
+        .formula-active {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .formula-inactive {
+            opacity: 0;
+            transform: translateX(-50%) translateY(20px);
+        }
+
+        /* 操作按钮 - 响应式调整 */
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: clamp(0.6rem, 2vw, 1rem);
+            justify-content: center;
+            opacity: 0;
+            transform: translateY(15px);
+            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1) 1.5s;
+        }
+
+        .action-btn {
+            padding: clamp(0.6rem, 2vw, 0.8rem) clamp(1.2rem, 4vw, 2rem);
+            border-radius: 50px;
+            font-size: clamp(0.8rem, 3vw, 1rem);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+            flex: 1 0 auto;
+            max-width: 220px;
+            text-align: center;
+        }
+
+        .primary-btn {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(0,113,255,0.25);
+        }
+
+        .manual-btn {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0,113,255,0.35);
+        }
+
+        /* 移动端特定样式 */
+        @media (max-width: 768px) {
+            .math-symbol {
+                animation-duration: 8s;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .action-btn {
+                width: 100%;
+                max-width: 280px;
+            }
+        }
+
+        /* 平板设备优化 */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .main-title {
+                font-size: clamp(2rem, 4vw, 3rem);
+            }
+            
+            .function-surface {
+                top: 32%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="intro-container" id="introContainer">
+        <!-- 数学符号星系 -->
+        <div class="math-galaxy" id="mathGalaxy"></div>
+        
+        <!-- 3D函数曲面 -->
+        <div class="function-surface" id="functionSurface">
+            <div class="surface-grid"></div>
+        </div>
+
+        <!-- 标题系统 -->
+        <div class="title-system">
+            <h1 class="main-title" id="mainTitle">数学函数可视化系统</h1>
+            <p class="sub-title" id="subTitle">探索数学之美 · 体验视觉之真</p>
+        </div>
+
+        <!-- 动态公式容器 -->
+        <div class="formula-container">
+            <div class="formula-display" id="formula1">e<sup>iπ</sup> + 1 = 0</div>
+            <div class="formula-display" id="formula2">f(z) = ∮<sub>γ</sub> sin(z²) dz</div>
+            <div class="formula-display" id="formula3">∇×E = -∂B/∂t</div>
+            <div class="formula-display" id="formula4">ψ(x,t) = A e<sup>i(kx-ωt)</sup></div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="action-buttons" id="actionButtons">
+            <button class="action-btn primary-btn" onclick="enterApp()">开始探索</button>
+            <button class="action-btn manual-btn" onclick="showManual('zh')">中文手册</button>
+            <button class="action-btn manual-btn" onclick="showManual('en')">English Manual</button>
+        </div>
+    </div>
+
+    <script>
+        // 响应式符号生成
+        function createMathGalaxy() {
+            const symbols = ['∮','∇','∂','∫','∑','∏','√','∞','≅','≈','ℏ','ψ','π','σ','φ'];
+            const container = document.getElementById('mathGalaxy');
+            const isMobile = window.innerWidth <= 768;
+            
+            const orbitCount = isMobile ? 4 : 6;
+            const symbolsPerOrbit = isMobile ? 8 : 12;
+            
+            for (let i = 0; i < orbitCount; i++) {
+                const orbit = document.createElement('div');
+                orbit.className = 'orbit';
+                orbit.style.width = `${80 + i * (isMobile ? 50 : 70)}px`;
+                orbit.style.height = `${80 + i * (isMobile ? 50 : 70)}px`;
+                orbit.style.left = `calc(50% - ${40 + i * (isMobile ? 25 : 35)}px)`;
+                orbit.style.top = `calc(50% - ${40 + i * (isMobile ? 25 : 35)}px)`;
+                orbit.style.animationDuration = `${15 + i * (isMobile ? 4 : 6)}s`;
+                orbit.style.opacity = '0';
+                
+                for (let j = 0; j < symbolsPerOrbit; j++) {
+                    const symbol = document.createElement('div');
+                    symbol.className = 'math-symbol';
+                    symbol.textContent = symbols[(i * symbolsPerOrbit + j) % symbols.length];
+                    symbol.style.left = `${Math.cos(j * 2 * Math.PI / symbolsPerOrbit) * 50}%`;
+                    symbol.style.top = `${Math.sin(j * 2 * Math.PI / symbolsPerOrbit) * 50}%`;
+                    symbol.style.animationDelay = `${j * 0.15}s`;
+                    orbit.appendChild(symbol);
+                }
+                
+                container.appendChild(orbit);
+                
+                setTimeout(() => {
+                    orbit.style.opacity = '1';
+                }, i * 150);
+            }
+        }
+
+        // 流畅公式轮播
+        function animateFormulas() {
+            const formulas = [
+                document.getElementById('formula1'),
+                document.getElementById('formula2'), 
+                document.getElementById('formula3'),
+                document.getElementById('formula4')
+            ];
+            
+            let current = 0;
+            
+            // 初始显示第一个公式
+            formulas[current].classList.add('formula-active');
+            
+            setInterval(() => {
+                // 当前公式淡出
+                formulas[current].classList.remove('formula-active');
+                formulas[current].classList.add('formula-inactive');
+                
+                // 切换到下一个公式
+                current = (current + 1) % formulas.length;
+                
+                // 新公式淡入
+                setTimeout(() => {
+                    formulas[current].classList.remove('formula-inactive');
+                    formulas[current].classList.add('formula-active');
+                }, 500);
+            }, 3000);
+        }
+
+        // 分阶段启动动画
+        function startAnimations() {
+            // 0. 容器淡入
+            document.getElementById('introContainer').style.opacity = '1';
+            document.getElementById('introContainer').style.transform = 'scale(1)';
+            
+            // 1. 数学符号星系 (0-1.2s)
+            createMathGalaxy();
+            
+            // 2. 标题系统 (1.2s)
+            setTimeout(() => {
+                document.getElementById('mainTitle').style.opacity = '1';
+                document.getElementById('mainTitle').style.transform = 'translateY(0)';
+                document.getElementById('subTitle').style.opacity = '1';
+                document.getElementById('subTitle').style.transform = 'translateY(0)';
+            }, 1200);
+            
+            // 3. 3D曲面和公式 (1.8s)
+            setTimeout(() => {
+                document.getElementById('functionSurface').style.opacity = '0.7';
+                animateFormulas();
+            }, 1800);
+            
+            // 4. 操作按钮 (2.5s)
+            setTimeout(() => {
+                document.getElementById('actionButtons').style.opacity = '1';
+                document.getElementById('actionButtons').style.transform = 'translateY(0)';
+            }, 2500);
+        }
+
+        // 响应式调整
+        function handleResize() {
+            // 重新创建符号星系以适应新尺寸
+            const galaxy = document.getElementById('mathGalaxy');
+            galaxy.innerHTML = '';
+            createMathGalaxy();
+        }
+
+        // 进入主应用
+        function enterApp() {
+            document.body.style.opacity = '0';
+            document.body.style.transition = 'opacity 0.8s ease';
+            setTimeout(() => {
+                window.location.href = "/Epivision-Pro-math-function/main2.html";
+            }, 800);
+        }
+
+        // 显示手册
+        function showManual(lang) {
+            const manualUrl = lang === 'zh' ? '/Epivision-Pro-math-function/EpiVision_Pro_User_ManualChinese.md' : '/Epivision-Pro-math-function/EpiVision_Pro_User_ManualEnglish.md';
+            window.open(manualUrl, '_blank');
+        }
+
+        // 初始化
+        window.addEventListener('load', startAnimations);
+        window.addEventListener('resize', handleResize);
+    </script>
+</body>
+</html>
